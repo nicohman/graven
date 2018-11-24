@@ -73,7 +73,14 @@
   flex-direction: row;
   width:980px;
 }
-
+#name-input {
+	width:400px;
+	height: 300px;
+	left: 235px;
+	top: 200px;
+	border: 1px solid #2aa198;
+	position:relative;	
+}
 /*:root {
 	--main-bg: #073642;
 	--text: #93a1a1;
