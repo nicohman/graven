@@ -96,12 +96,12 @@ impl Layout for DataModel {
             .with_child(cur_theme)
             .with_child(bottom_bar);
         let mut dom = Dom::new(Div)
-            .with_id("main");
-        if self.new_popup_shown {
-            dom = dom.with_child(name_popup);            
-        }
-        dom = dom.with_child(buts)
+            .with_id("main").with_child(buts)
             .with_child(right);
+        if self.new_popup_shown {
+            dom = dom.with_child(name_popup);
+        }
+        
         dom
     }
 }
@@ -295,4 +295,5 @@ fn main() {
     let css = Css::override_native(include_str!(CSS_PATH!())).unwrap();
     let window = Window::new(create_options, css).unwrap();
     app.run(window).unwrap();
+
 }
