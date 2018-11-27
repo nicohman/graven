@@ -58,7 +58,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 [[package]]
 name = "azul"
 version = "0.1.0"
-source = "git+https://github.com/maps4print/azul?rev=2068541297c8345b622a8a05c5e0ac690d1c154e#2068541297c8345b622a8a05c5e0ac690d1c154e"
+source = "git+https://github.com/maps4print/azul?rev=741e3e98ad92df90daf7438b6ba5d64b620ecd47#741e3e98ad92df90daf7438b6ba5d64b620ecd47"
 dependencies = [
  "app_units 0.7.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "backtrace 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -759,7 +759,7 @@ dependencies = [
 name = "graven"
 version = "0.1.0"
 dependencies = [
- "azul 0.1.0 (git+https://github.com/maps4print/azul?rev=2068541297c8345b622a8a05c5e0ac690d1c154e)",
+ "azul 0.1.0 (git+https://github.com/maps4print/azul?rev=741e3e98ad92df90daf7438b6ba5d64b620ecd47)",
  "ravenlib 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "reqwest 0.9.5 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
@@ -2632,7 +2632,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 "checksum argon2rs 0.2.5 (registry+https://github.com/rust-lang/crates.io-index)" = "3f67b0b6a86dae6e67ff4ca2b6201396074996379fba2b92ff649126f37cb392"
 "checksum arrayvec 0.4.7 (registry+https://github.com/rust-lang/crates.io-index)" = "a1e964f9e24d588183fcb43503abda40d288c8657dfc27311516ce2f05675aef"
 "checksum ascii 0.8.7 (registry+https://github.com/rust-lang/crates.io-index)" = "97be891acc47ca214468e09425d02cef3af2c94d0d82081cd02061f996802f14"
-"checksum azul 0.1.0 (git+https://github.com/maps4print/azul?rev=2068541297c8345b622a8a05c5e0ac690d1c154e)" = "<none>"
+"checksum azul 0.1.0 (git+https://github.com/maps4print/azul?rev=741e3e98ad92df90daf7438b6ba5d64b620ecd47)" = "<none>"
 "checksum backtrace 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)" = "89a47830402e9981c5c41223151efcced65a0510c13097c769cede7efb34782a"
 "checksum backtrace-sys 0.1.24 (registry+https://github.com/rust-lang/crates.io-index)" = "c66d56ac8dabd07f6aacdaf633f4b8262f5b3601a810a0dcddffd5c22c69daa0"
 "checksum base64 0.9.3 (registry+https://github.com/rust-lang/crates.io-index)" = "489d6c0ed21b11d038c31b6ceccca973e65d73ba3bd8ecb9a2babf5546164643"

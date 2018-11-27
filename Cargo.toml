@@ -11,6 +11,6 @@ license="GPL-3.0"
 name = "graven"
 path = "src/gui.rs"
 [dependencies]
-azul = { git = "https://github.com/maps4print/azul", rev = "2068541297c8345b622a8a05c5e0ac690d1c154e" }
+azul = { git = "https://github.com/maps4print/azul", rev = "741e3e98ad92df90daf7438b6ba5d64b620ecd47" }
 ravenlib = "1.0.0"
 reqwest = "0.9.5"

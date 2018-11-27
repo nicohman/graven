@@ -90,8 +90,10 @@ impl Layout for DataModel {
             .with_child(cur_theme)
             .with_child(bottom_bar);
         let mut dom = Dom::new(Div)
-            .with_id("main").with_child(buts)
+            .with_id("main")
+            .with_child(buts)
             .with_child(right);
+        dom.debug_dump();
         dom
     }
 }
@@ -248,10 +250,12 @@ fn main() {
             text = text + "Description:\n\n" + theme.description.as_str() + "\n\n";
         }
         text += "Options Added: \n\n";
-        let option_string = theme
+        let mut option_string = theme
             .options
             .iter()
             .fold(text, |acc, opt| acc + &format!("- {}\n", opt));
+        option_string += "Key-Value Options: \n\n";
+        option_string = theme.kv.iter().fold(option_string, |acc, (k,v)| acc + &format!("- {} : {}\n",k.as_str(),v));
         let text_id = app.add_text_cached(option_string, &font_id, PixelValue::px(10.0), None);
         app.app_state.data.modify(|state| {
             state.text.push(text_id);
@@ -262,6 +266,9 @@ fn main() {
     size.dimensions = LogicalSize::new(980.0, 600.0);
     create_options.state.title = String::from("graven");
     create_options.state.size = size;
+    #[cfg(debug_assertions)]
+    let css = Css::hot_reload_override_native(CSS_PATH!()).unwrap();
+    #[cfg(not(debug_assertions))]
     let css = Css::override_native(include_str!(CSS_PATH!())).unwrap();
     let window = Window::new(create_options, css).unwrap();
     app.run(window).unwrap();
