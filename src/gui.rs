@@ -24,6 +24,9 @@ struct DataModel {
     selected_theme: Option<usize>,
     text: Vec<TextId>,
     screenshots: Vec<Option<String>>,
+    new_popup_shown: bool,
+    name_input: TextInputState,
+    font: FontId
 }
 impl Layout for DataModel {
     fn layout(&self, info: WindowInfo<Self>) -> Dom<Self> {
@@ -58,8 +61,10 @@ impl Layout for DataModel {
         let online_button = Button::with_label("View on ThemeHub")
             .dom().with_class("bot-button")
             .with_callback(On::MouseUp, Callback(online_callback));
+            let new_button = Button::with_label("New Theme").dom().with_class("bot-button").with_callback(On::MouseUp, Callback(show_new_box));
+
         let open_button = Button::with_label("View in File Manager").dom().with_class("bot-button").with_callback(On::MouseUp, Callback(open_callback));
-        if self.selected_theme.is_some() {
+        if self.selected_theme.is_some() && self.selected_theme.unwrap() < self.themes.len() {
             let theme = &self.themes[self.selected_theme.unwrap()];
 
             let name = Dom::new(Label(theme.name.clone())).with_class("theme-name");
@@ -78,13 +83,18 @@ impl Layout for DataModel {
         } else {
             cur_theme = cur_theme.with_child(Dom::new(Label(format!("No Theme selected."))));
         }
+        let name_input = TextInput::new().bind(info.window, &self.name_input, &self).dom(&self.name_input).with_id("name-input");
+        let close_name = Button::with_label("x").dom().with_id("close-name").with_callback(On::MouseUp, Callback(hide_new_box));
+        let submit_name = Button::with_label("Create").dom().with_id("submit-name").with_callback(On::MouseUp, Callback(create_callback));
+        let mut name_popup = Dom::new(Div).with_id("name-popup").with_child(name_input).with_child(submit_name).with_child(close_name);
         let mut bottom_bar = Dom::new(Div)
             .with_id("bottom-bar")
             .with_child(online_button)
             .with_child(open_button)
             .with_child(refresh_button)
             .with_child(load_button)
-            .with_child(delete_button);
+            .with_child(delete_button)
+            .with_child(new_button);
         let right = Dom::new(Div)
             .with_id("right")
             .with_child(cur_theme)
@@ -93,10 +103,42 @@ impl Layout for DataModel {
             .with_id("main")
             .with_child(buts)
             .with_child(right);
-        dom.debug_dump();
+        if self.new_popup_shown {
+            dom = dom.with_child(name_popup);
+        }
         dom
     }
 }
+fn create_callback(state: &mut AppState<DataModel>, event: WindowEvent<DataModel>) -> UpdateScreen {
+    let mut option_string = String::new();
+    state.data.modify(|data| {
+        println!("Making a theme named {}", data.name_input.text);
+        new_theme(data.name_input.text.as_str());
+        let theme = load_theme(data.name_input.text.as_str()).unwrap();
+        data.new_popup_shown = false;
+        option_string = theme_text(&theme);
+        data.themes.push(theme);
+    });
+    let font_id = FontId::BuiltinFont("sans-serif".into());
+    let text_id = state.resources.add_text_cached(option_string, &font_id, StyleFontSize(PixelValue::px(10.0)), None);
+    state.data.modify(|data| {
+        data.text.push(text_id);
+    });
+    UpdateScreen::Redraw
+}
+fn show_new_box(state: &mut AppState<DataModel>, event: WindowEvent<DataModel>) -> UpdateScreen {
+    state.data.modify(|data| {
+        data.new_popup_shown = true;
+    });
+    UpdateScreen::Redraw
+}
+fn hide_new_box(state: &mut AppState<DataModel>, event: WindowEvent<DataModel>) -> UpdateScreen {
+    state.data.modify(|data| {
+        data.new_popup_shown = false;
+    });
+    UpdateScreen::Redraw
+}
+
 fn load_callback(state: &mut AppState<DataModel>, event: WindowEvent<DataModel>) -> UpdateScreen {
     let data = state.data.lock().unwrap();
     if data.selected_theme.is_some() {
@@ -176,6 +218,20 @@ fn select_theme(
     });
     should_redraw
 }
+fn theme_text(theme: &Theme) -> String {
+    let mut text = String::new();
+    if theme.description != default_desc() && theme.description.len() > 0 {
+        text = text + "Description:\n\n" + theme.description.as_str() + "\n\n";
+    }
+    text += "Options Added: \n\n";
+    let mut option_string = theme
+        .options
+        .iter()
+        .fold(text, |acc, opt| acc + &format!("- {}\n", opt));
+    option_string += "Key-Value Options: \n\n";
+    option_string = theme.kv.iter().fold(option_string, |acc, (k,v)| acc + &format!("- {} : {}\n",k.as_str(),v));
+    return option_string;
+}
 fn main() {
     if fs::metadata(get_home() + "/.config/raven/screenshots").is_err() {
         let cres = fs::create_dir(get_home() + "/.config/raven/screenshots");
@@ -193,6 +249,8 @@ fn main() {
     }
     println!("Starting GUI");
     let mut themes = load_themes();
+    let font_id = FontId::BuiltinFont("sans-serif".into());
+
     let mut app = App::new(
         DataModel {
             config: get_config(),
@@ -200,11 +258,13 @@ fn main() {
             themes: themes.clone(),
             text: vec![],
             screenshots: vec![],
+            new_popup_shown: false,
+            name_input: TextInputState::default(),
+            font: font_id.clone()
         },
         AppConfig::default(),
     );
 
-    let font_id = FontId::BuiltinFont("sans-serif".into());
     for (i, theme) in themes.iter().enumerate() {
         if theme.screenshot != default_screen() {
             let mut buf: Vec<u8> = vec![];
@@ -245,17 +305,7 @@ fn main() {
                 state.screenshots[i] = Some(theme.name.clone());
             });
         }
-        let mut text = String::new();
-        if theme.description != default_desc() && theme.description.len() > 0 {
-            text = text + "Description:\n\n" + theme.description.as_str() + "\n\n";
-        }
-        text += "Options Added: \n\n";
-        let mut option_string = theme
-            .options
-            .iter()
-            .fold(text, |acc, opt| acc + &format!("- {}\n", opt));
-        option_string += "Key-Value Options: \n\n";
-        option_string = theme.kv.iter().fold(option_string, |acc, (k,v)| acc + &format!("- {} : {}\n",k.as_str(),v));
+        let option_string = theme_text(&theme);
         let text_id = app.add_text_cached(option_string, &font_id, PixelValue::px(10.0), None);
         app.app_state.data.modify(|state| {
             state.text.push(text_id);

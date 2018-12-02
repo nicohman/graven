@@ -64,11 +64,30 @@
   background-color: #1a7770;
   font-size:20px;
 }
-
+#name-popup {
+  position: absolute;
+  left: 300px;
+  top:200px;
+  width: 400px;
+  height:100px;
+  border: 2px solid #2aa198;
+}
+#name-input {
+  height:60px;
+  text-align: center;
+  background-color: #073642;
+}
+#submit-name {
+  height:40px;
+}
 #main {
   flex-direction: row;
 }
-
+#close-name {
+  position: relative;
+  top:0px;
+  right:0px;
+}
 /*:root {
 	--main-bg: #073642;
 	--text: #93a1a1;
