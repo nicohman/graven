@@ -64,7 +64,7 @@
   background-color: #1a7770;
   font-size:20px;
 }
-#name-popup {
+.popup {
   position: absolute;
   left: 300px;
   top:200px;
@@ -73,13 +73,13 @@
   border: 2px solid #2aa198;
   background-color: #073642;
 }
-#name-input {
+.popup-input {
   height:60px;
   margin-left:75px;
   width:250px;
   text-align: center;
 }
-#submit-name {
+.popup-submit {
   height:40px;
 }
 #main {

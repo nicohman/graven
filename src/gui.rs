@@ -26,7 +26,9 @@ struct DataModel {
     screenshots: Vec<Option<String>>,
     new_popup_shown: bool,
     name_input: TextInputState,
-    font: FontId
+    font: FontId,
+    install_popup_shown: bool,
+    install_input: TextInputState
 }
 impl Layout for DataModel {
     fn layout(&self, info: WindowInfo<Self>) -> Dom<Self> {
@@ -62,7 +64,7 @@ impl Layout for DataModel {
             .dom().with_class("bot-button")
             .with_callback(On::MouseUp, Callback(online_callback));
             let new_button = Button::with_label("New Theme").dom().with_class("bot-button").with_callback(On::MouseUp, Callback(show_new_box));
-
+        let install_button = Button::with_label("Install Theme").dom().with_class("bot-button").with_callback(On::MouseUp, Callback(show_install_box));
         let open_button = Button::with_label("View in File Manager").dom().with_class("bot-button").with_callback(On::MouseUp, Callback(open_callback));
         if self.selected_theme.is_some() && self.selected_theme.unwrap() < self.themes.len() {
             let theme = &self.themes[self.selected_theme.unwrap()];
@@ -83,9 +85,13 @@ impl Layout for DataModel {
         } else {
             cur_theme = cur_theme.with_child(Dom::new(Label(format!("No Theme selected."))));
         }
-        let name_input = TextInput::new().bind(info.window, &self.name_input, &self).dom(&self.name_input).with_id("name-input");
-        let close_name = Button::with_label("x").dom().with_id("close-name").with_callback(On::MouseUp, Callback(hide_new_box));
-        let submit_name = Button::with_label("Create").dom().with_id("submit-name").with_callback(On::MouseUp, Callback(create_callback));
+        let name_input = TextInput::new().bind(info.window, &self.name_input, &self).dom(&self.name_input).with_class("popup-input");
+        let close_name = Button::with_label("x").dom().with_class("popup-close").with_callback(On::MouseUp, Callback(hide_new_box));
+        let submit_name = Button::with_label("Create").dom().with_class("popup-submit").with_callback(On::MouseUp, Callback(create_callback));
+        let install_input = TextInput::new().bind(info.window, &self.install_input, &self).dom(&self.install_input).with_class("popup-input");
+        let close_install = Button::with_label("x").dom().with_class("popup-close").with_callback(On::MouseUp, Callback(hide_install_box));
+        let submit_install = Button::with_label("Install").dom().with_class("popup-submit").with_callback(On::MouseUp, Callback(install_callback));
+        let mut install_popup = Dom::new(Div).with_class("popup").with_child(install_input).with_child(submit_install).with_child(close_install);
         let mut name_popup = Dom::new(Div).with_id("name-popup").with_child(name_input).with_child(submit_name).with_child(close_name);
         let mut bottom_bar = Dom::new(Div)
             .with_id("bottom-bar")
@@ -94,7 +100,8 @@ impl Layout for DataModel {
             .with_child(refresh_button)
             .with_child(load_button)
             .with_child(delete_button)
-            .with_child(new_button);
+            .with_child(new_button)
+            .with_child(install_button);
         let right = Dom::new(Div)
             .with_id("right")
             .with_child(cur_theme)
@@ -106,9 +113,32 @@ impl Layout for DataModel {
         if self.new_popup_shown {
             dom = dom.with_child(name_popup);
         }
+        if self.install_popup_shown {
+            dom = dom.with_child(install_popup);
+        }
         dom
     }
 }
+fn install_callback(state: &mut AppState<DataModel>, event: WindowEvent<DataModel>) -> UpdateScreen {
+    state.data.modify(|data| {
+        println!("Installing a theme named {}", data.install_input.text);
+    });
+    UpdateScreen::Redraw    
+}
+fn show_install_box(state: &mut AppState<DataModel>, event: WindowEvent<DataModel>) -> UpdateScreen {
+    state.data.modify(|data| {
+        data.install_popup_shown = true;
+    });
+    UpdateScreen::Redraw
+}
+fn hide_install_box(state: &mut AppState<DataModel>, event: WindowEvent<DataModel>) -> UpdateScreen {
+    state.data.modify(|data| {
+        data.install_popup_shown = false;
+    });
+    UpdateScreen::Redraw
+}
+
+
 fn create_callback(state: &mut AppState<DataModel>, event: WindowEvent<DataModel>) -> UpdateScreen {
     let mut option_string = String::new();
     state.data.modify(|data| {
@@ -260,7 +290,9 @@ fn main() {
             screenshots: vec![],
             new_popup_shown: false,
             name_input: TextInputState::default(),
-            font: font_id.clone()
+            font: font_id.clone(),
+            install_input: TextInputState::default(),
+            install_popup_shown: false
         },
         AppConfig::default(),
     );
