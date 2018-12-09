@@ -18,17 +18,35 @@ use std::process::Command;
 use std::sync::Arc;
 use themes::*;
 use NodeType::*;
+enum Popup {
+    New,
+    Install
+}
+use Popup::*;
+impl Popup {
+    fn label(&self) -> String {
+        match self {
+            New => "Create",
+            Install => "Install"
+        }.to_string()
+    }
+    fn callback(&self) -> Callback<DataModel> {
+        Callback(match self {
+                New => create_callback,
+                Install => install_callback
+        })
+    }
+}
 struct DataModel {
     config: Config,
     themes: Vec<Theme>,
     selected_theme: Option<usize>,
     text: Vec<TextId>,
     screenshots: Vec<Option<String>>,
-    new_popup_shown: bool,
-    name_input: TextInputState,
     font: FontId,
-    install_popup_shown: bool,
-    install_input: TextInputState
+    popup_input: TextInputState,
+    popup_shown: bool,
+    popup_current: Popup,
 }
 impl Layout for DataModel {
     fn layout(&self, info: WindowInfo<Self>) -> Dom<Self> {
@@ -63,7 +81,7 @@ impl Layout for DataModel {
         let online_button = Button::with_label("View on ThemeHub")
             .dom().with_class("bot-button")
             .with_callback(On::MouseUp, Callback(online_callback));
-            let new_button = Button::with_label("New Theme").dom().with_class("bot-button").with_callback(On::MouseUp, Callback(show_new_box));
+        let new_button = Button::with_label("New Theme").dom().with_class("bot-button").with_callback(On::MouseUp, Callback(show_new_box));
         let install_button = Button::with_label("Install Theme").dom().with_class("bot-button").with_callback(On::MouseUp, Callback(show_install_box));
         let open_button = Button::with_label("View in File Manager").dom().with_class("bot-button").with_callback(On::MouseUp, Callback(open_callback));
         if self.selected_theme.is_some() && self.selected_theme.unwrap() < self.themes.len() {
@@ -85,14 +103,6 @@ impl Layout for DataModel {
         } else {
             cur_theme = cur_theme.with_child(Dom::new(Label(format!("No Theme selected."))));
         }
-        let name_input = TextInput::new().bind(info.window, &self.name_input, &self).dom(&self.name_input).with_class("popup-input");
-        let close_name = Button::with_label("x").dom().with_class("popup-close").with_callback(On::MouseUp, Callback(hide_new_box));
-        let submit_name = Button::with_label("Create").dom().with_class("popup-submit").with_callback(On::MouseUp, Callback(create_callback));
-        let install_input = TextInput::new().bind(info.window, &self.install_input, &self).dom(&self.install_input).with_class("popup-input");
-        let close_install = Button::with_label("x").dom().with_class("popup-close").with_callback(On::MouseUp, Callback(hide_install_box));
-        let submit_install = Button::with_label("Install").dom().with_class("popup-submit").with_callback(On::MouseUp, Callback(install_callback));
-        let mut install_popup = Dom::new(Div).with_class("popup").with_child(install_input).with_child(submit_install).with_child(close_install);
-        let mut name_popup = Dom::new(Div).with_id("name-popup").with_child(name_input).with_child(submit_name).with_child(close_name);
         let mut bottom_bar = Dom::new(Div)
             .with_id("bottom-bar")
             .with_child(online_button)
@@ -110,42 +120,43 @@ impl Layout for DataModel {
             .with_id("main")
             .with_child(buts)
             .with_child(right);
-        if self.new_popup_shown {
-            dom = dom.with_child(name_popup);
-        }
-        if self.install_popup_shown {
-            dom = dom.with_child(install_popup);
+        if self.popup_shown {
+            let popup_input = TextInput::new().bind(info.window, &self.popup_input, &self).dom(&self.popup_input).with_class("popup-input");
+            let close_popup = Button::with_label("x").dom().with_class("popup-close").with_callback(On::MouseUp, Callback(hide_popup));
+            let submit = Button::with_label(self.popup_current.label()).dom().with_class("popup-submit").with_callback(On::MouseUp, self.popup_current.callback());
+            let mut popup = Dom::new(Div).with_class("popup").with_child(popup_input).with_child(submit).with_child(close_popup);
+            dom = dom.with_child(popup);
         }
         dom
     }
 }
 fn install_callback(state: &mut AppState<DataModel>, event: WindowEvent<DataModel>) -> UpdateScreen {
     state.data.modify(|data| {
-        println!("Installing a theme named {}", data.install_input.text);
+        println!("Installing a theme named {}", data.popup_input.text);
     });
-    UpdateScreen::Redraw    
+    UpdateScreen::Redraw
 }
 fn show_install_box(state: &mut AppState<DataModel>, event: WindowEvent<DataModel>) -> UpdateScreen {
     state.data.modify(|data| {
-        data.install_popup_shown = true;
+        data.popup_current = Popup::Install;
+        data.popup_shown = true;
+        data.popup_input = TextInputState::default();
     });
     UpdateScreen::Redraw
 }
-fn hide_install_box(state: &mut AppState<DataModel>, event: WindowEvent<DataModel>) -> UpdateScreen {
+fn hide_popup(state: &mut AppState<DataModel>, event: WindowEvent<DataModel>) -> UpdateScreen {
     state.data.modify(|data| {
-        data.install_popup_shown = false;
+        data.popup_shown = false;
     });
     UpdateScreen::Redraw
 }
-
-
 fn create_callback(state: &mut AppState<DataModel>, event: WindowEvent<DataModel>) -> UpdateScreen {
     let mut option_string = String::new();
     state.data.modify(|data| {
-        println!("Making a theme named {}", data.name_input.text);
-        new_theme(data.name_input.text.as_str());
-        let theme = load_theme(data.name_input.text.as_str()).unwrap();
-        data.new_popup_shown = false;
+        println!("Making a theme named {}", data.popup_input.text);
+        new_theme(data.popup_input.text.as_str());
+        let theme = load_theme(data.popup_input.text.as_str()).unwrap();
+        data.popup_shown = false;
         option_string = theme_text(&theme);
         data.themes.push(theme);
     });
@@ -158,13 +169,9 @@ fn create_callback(state: &mut AppState<DataModel>, event: WindowEvent<DataModel
 }
 fn show_new_box(state: &mut AppState<DataModel>, event: WindowEvent<DataModel>) -> UpdateScreen {
     state.data.modify(|data| {
-        data.new_popup_shown = true;
-    });
-    UpdateScreen::Redraw
-}
-fn hide_new_box(state: &mut AppState<DataModel>, event: WindowEvent<DataModel>) -> UpdateScreen {
-    state.data.modify(|data| {
-        data.new_popup_shown = false;
+        data.popup_current = Popup::New;
+        data.popup_shown = true;
+        data.popup_input = TextInputState::default();
     });
     UpdateScreen::Redraw
 }
@@ -263,6 +270,7 @@ fn theme_text(theme: &Theme) -> String {
     return option_string;
 }
 fn main() {
+    use Popup::*;
     if fs::metadata(get_home() + "/.config/raven/screenshots").is_err() {
         let cres = fs::create_dir(get_home() + "/.config/raven/screenshots");
         if cres.is_err() {
@@ -288,11 +296,10 @@ fn main() {
             themes: themes.clone(),
             text: vec![],
             screenshots: vec![],
-            new_popup_shown: false,
-            name_input: TextInputState::default(),
             font: font_id.clone(),
-            install_input: TextInputState::default(),
-            install_popup_shown: false
+            popup_input: TextInputState::default(),
+            popup_shown: false,
+            popup_current: New
         },
         AppConfig::default(),
     );
