@@ -12,5 +12,5 @@ name = "graven"
 path = "src/gui.rs"
 [dependencies]
 azul = { git = "https://github.com/maps4print/azul", rev = "984b20c7e5933d93453c0cb5d9e9956be2cab94d" }
-ravenlib = "1.0.1"
+ravenlib = "1.2.2"
 reqwest = "0.9.5"

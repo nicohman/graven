@@ -7,6 +7,10 @@ use azul::app_state::AppStateNoData;
 use azul::widgets::text_input::*;
 use config::*;
 use ravenlib::*;
+use ravenlib::ravenserver::*;
+use ravenlib::error::*;
+use ErrorKind::*;
+use RavenServerErrorKind::*;
 use std::cell::RefCell;
 use std::collections::BTreeSet;
 use std::fs;
@@ -131,9 +135,36 @@ impl Layout for DataModel {
     }
 }
 fn install_callback(state: &mut AppState<DataModel>, event: WindowEvent<DataModel>) -> UpdateScreen {
+    let mut option_string = String::new();
     state.data.modify(|data| {
-        println!("Installing a theme named {}", data.popup_input.text);
+        let name = data.popup_input.text.clone();
+        println!("Installing a theme named {}", name);
+        let res = get_metadata(name.as_str());
+        if res.is_err() {
+            let err = res.err().unwrap();
+            match err {
+                Error(Server(rse), _) => {
+                    match rse {
+                        DoesNotExist(s) => println!("This theme does not exist."),
+                        _ => println!("Error encountered.\n {:?}", rse)
+                    };
+                },
+                _ => println!("Error encountered.\n {:?}", err)
+            };
+        } else {
+            download_theme(name.as_str(), true).expect("Couldn't install theme");
+            let theme = load_theme(name.as_str()).unwrap();
+            option_string = theme_text(&theme);
+            data.themes.push(theme);
+        }
     });
+    if option_string.len() > 0 {
+        let font_id = FontId::BuiltinFont("sans-serif".into());
+        let text_id = state.resources.add_text_cached(option_string, &font_id, StyleFontSize(PixelValue::px(10.0)), None);
+        state.data.modify(|data| {
+            data.text.push(text_id);
+        });
+    }
     UpdateScreen::Redraw
 }
 fn show_install_box(state: &mut AppState<DataModel>, event: WindowEvent<DataModel>) -> UpdateScreen {
@@ -264,7 +295,7 @@ fn theme_text(theme: &Theme) -> String {
     let mut option_string = theme
         .options
         .iter()
-        .fold(text, |acc, opt| acc + &format!("- {}\n", opt));
+        .fold(text, |acc, opt| acc + &format!("- {}\n", opt.to_string()));
     option_string += "Key-Value Options: \n\n";
     option_string = theme.kv.iter().fold(option_string, |acc, (k,v)| acc + &format!("- {} : {}\n",k.as_str(),v));
     return option_string;
@@ -286,12 +317,12 @@ fn main() {
         };
     }
     println!("Starting GUI");
-    let mut themes = load_themes();
+    let mut themes = load_themes().unwrap();
     let font_id = FontId::BuiltinFont("sans-serif".into());
 
     let mut app = App::new(
         DataModel {
-            config: get_config(),
+            config: get_config().unwrap(),
             selected_theme: None,
             themes: themes.clone(),
             text: vec![],
