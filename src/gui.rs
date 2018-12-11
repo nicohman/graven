@@ -2,7 +2,7 @@ extern crate azul;
 extern crate ravenlib;
 extern crate reqwest;
 use azul::window_state::WindowSize;
-use azul::{prelude::*, widgets::button::Button};
+use azul::{prelude::*, widgets::button::Button, widgets::label::Label};
 use azul::app_state::AppStateNoData;
 use azul::widgets::text_input::*;
 use config::*;
@@ -24,21 +24,30 @@ use themes::*;
 use NodeType::*;
 enum Popup {
     New,
-    Install
+    Install,
+    Installed
 }
 use Popup::*;
 impl Popup {
     fn label(&self) -> String {
         match self {
             New => "Create",
-            Install => "Install"
+            Install => "Install",
+            Installed => "Theme Installed"
         }.to_string()
     }
     fn callback(&self) -> Callback<DataModel> {
         Callback(match self {
                 New => create_callback,
-                Install => install_callback
+                Install => install_callback,
+                _ => empty_callback
         })
+    }
+    fn is_input(&self) -> bool {
+       match self {
+        Installed => false,
+        _ => true
+       }
     }
 }
 struct DataModel {
@@ -125,14 +134,24 @@ impl Layout for DataModel {
             .with_child(buts)
             .with_child(right);
         if self.popup_shown {
-            let popup_input = TextInput::new().bind(info.window, &self.popup_input, &self).dom(&self.popup_input).with_class("popup-input");
             let close_popup = Button::with_label("x").dom().with_class("popup-close").with_callback(On::MouseUp, Callback(hide_popup));
-            let submit = Button::with_label(self.popup_current.label()).dom().with_class("popup-submit").with_callback(On::MouseUp, self.popup_current.callback());
-            let mut popup = Dom::new(Div).with_class("popup").with_child(popup_input).with_child(submit).with_child(close_popup);
+            let mut popup = Dom::new(Div).with_class("popup").with_child(close_popup);
+            if self.popup_current.is_input() {
+                let submit = Button::with_label(self.popup_current.label()).dom().with_class("popup-submit").with_callback(On::MouseUp, self.popup_current.callback());
+                let popup_input = TextInput::new().bind(info.window, &self.popup_input, &self).dom(&self.popup_input).with_class("popup-input");
+                popup = popup.with_child(popup_input).with_child(submit);
+            } else {
+                let ok_button = Button::with_label("OK").dom().with_class("popup-submit").with_callback(On::MouseUp, Callback(hide_popup));
+                let label =Label::new(self.popup_current.label()).dom().with_class("popup-label");
+                popup = popup.with_child(label).with_child(ok_button);
+            }
             dom = dom.with_child(popup);
         }
         dom
     }
+}
+fn empty_callback(state: &mut AppState<DataModel>, event: WindowEvent<DataModel>) -> UpdateScreen {
+    UpdateScreen::DontRedraw
 }
 fn install_callback(state: &mut AppState<DataModel>, event: WindowEvent<DataModel>) -> UpdateScreen {
     let mut option_string = String::new();
@@ -163,6 +182,7 @@ fn install_callback(state: &mut AppState<DataModel>, event: WindowEvent<DataMode
         let text_id = state.resources.add_text_cached(option_string, &font_id, StyleFontSize(PixelValue::px(10.0)), None);
         state.data.modify(|data| {
             data.text.push(text_id);
+            data.popup_current = Installed;
         });
     }
     UpdateScreen::Redraw
