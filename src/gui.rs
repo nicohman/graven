@@ -25,7 +25,8 @@ use NodeType::*;
 enum Popup {
     New,
     Install,
-    Installed
+    Installed,
+    DidNotExist
 }
 use Popup::*;
 impl Popup {
@@ -33,7 +34,8 @@ impl Popup {
         match self {
             New => "Create",
             Install => "Install",
-            Installed => "Theme Installed"
+            Installed => "Theme Installed",
+            DidNotExist => "Theme Does Not Exist"
         }.to_string()
     }
     fn callback(&self) -> Callback<DataModel> {
@@ -46,6 +48,7 @@ impl Popup {
     fn is_input(&self) -> bool {
        match self {
         Installed => false,
+        DidNotExist => false,
         _ => true
        }
     }
@@ -164,7 +167,10 @@ fn install_callback(state: &mut AppState<DataModel>, event: WindowEvent<DataMode
             match err {
                 Error(Server(rse), _) => {
                     match rse {
-                        DoesNotExist(s) => println!("This theme does not exist."),
+                        DoesNotExist(s) => {
+                            println!("This theme does not exist.");
+                            data.popup_current = DidNotExist;
+                        },
                         _ => println!("Error encountered.\n {:?}", rse)
                     };
                 },
@@ -205,7 +211,7 @@ fn create_callback(state: &mut AppState<DataModel>, event: WindowEvent<DataModel
     let mut option_string = String::new();
     state.data.modify(|data| {
         println!("Making a theme named {}", data.popup_input.text);
-        new_theme(data.popup_input.text.as_str());
+        new_theme(data.popup_input.text.as_str()).unwrap();
         let theme = load_theme(data.popup_input.text.as_str()).unwrap();
         data.popup_shown = false;
         option_string = theme_text(&theme);
@@ -234,7 +240,7 @@ fn load_callback(state: &mut AppState<DataModel>, event: WindowEvent<DataModel>)
             "Loading theme {}",
             data.themes[data.selected_theme.unwrap()].name
         );
-        run_theme(&data.themes[data.selected_theme.unwrap()]);
+        run_theme(&data.themes[data.selected_theme.unwrap()]).unwrap();
         UpdateScreen::Redraw
     } else {
         UpdateScreen::DontRedraw
@@ -261,7 +267,7 @@ fn delete_callback(state: &mut AppState<DataModel>, event: WindowEvent<DataModel
                 "Deleting theme {}",
                 data.themes[data.selected_theme.unwrap()].name
             );
-            del_theme(data.themes[data.selected_theme.unwrap()].name.as_str());
+            del_theme(data.themes[data.selected_theme.unwrap()].name.as_str()).unwrap();
             data.themes.remove(data.selected_theme.unwrap());
             data.selected_theme = Some(0);
             up = UpdateScreen::Redraw
@@ -273,7 +279,7 @@ fn refresh_callback(
     state: &mut AppState<DataModel>,
     event: WindowEvent<DataModel>,
 ) -> UpdateScreen {
-    refresh_theme(state.data.lock().unwrap().config.last.clone());
+    refresh_theme(state.data.lock().unwrap().config.last.clone()).unwrap();
     UpdateScreen::DontRedraw
 }
 fn online_callback(state: &mut AppState<DataModel>, event: WindowEvent<DataModel>) -> UpdateScreen {
@@ -374,7 +380,7 @@ fn main() {
                         println!("Failed reading. Error Message: \n{:?}", r);
                         continue;
                     } else {
-                        fd.seek(SeekFrom::Start(0));
+                        fd.seek(SeekFrom::Start(0)).unwrap();
                         fd.write_all(&mut buf).expect("Couldn't write to file");
                     }
                 } else {
