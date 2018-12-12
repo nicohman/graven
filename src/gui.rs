@@ -26,7 +26,10 @@ enum Popup {
     New,
     Install,
     Installed,
-    DidNotExist
+    DidNotExist,
+    NotSignedIn,
+    PublishedOnline,
+    UpdatedOnline
 }
 use Popup::*;
 impl Popup {
@@ -35,7 +38,10 @@ impl Popup {
             New => "Create",
             Install => "Install",
             Installed => "Theme Installed",
-            DidNotExist => "Theme Does Not Exist"
+            DidNotExist => "Theme Does Not Exist",
+            NotSignedIn => "You are not logged into ThemeHub",
+            PublishedOnline => "Published theme online",
+            UpdatedOnline => "Updated theme online"
         }.to_string()
     }
     fn callback(&self) -> Callback<DataModel> {
@@ -49,6 +55,9 @@ impl Popup {
        match self {
         Installed => false,
         DidNotExist => false,
+        NotSignedIn => false,
+        PublishedOnline => false,
+        UpdatedOnline => false,
         _ => true
        }
     }
@@ -100,6 +109,7 @@ impl Layout for DataModel {
         let new_button = Button::with_label("New Theme").dom().with_class("bot-button").with_callback(On::MouseUp, Callback(show_new_box));
         let install_button = Button::with_label("Install Theme").dom().with_class("bot-button").with_callback(On::MouseUp, Callback(show_install_box));
         let open_button = Button::with_label("View in File Manager").dom().with_class("bot-button").with_callback(On::MouseUp, Callback(open_callback));
+        let publish_button = Button::with_label("Publish on ThemeHub").dom().with_class("bot-button").with_callback(On::MouseUp, Callback(publish_callback));
         if self.selected_theme.is_some() && self.selected_theme.unwrap() < self.themes.len() {
             let theme = &self.themes[self.selected_theme.unwrap()];
 
@@ -127,7 +137,7 @@ impl Layout for DataModel {
             .with_child(load_button)
             .with_child(delete_button)
             .with_child(new_button)
-            .with_child(install_button);
+            .with_child(install_button).with_child(publish_button);
         let right = Dom::new(Div)
             .with_id("right")
             .with_child(cur_theme)
@@ -152,6 +162,41 @@ impl Layout for DataModel {
         }
         dom
     }
+}
+fn publish_callback(state: &mut AppState<DataModel>, event: WindowEvent<DataModel>) -> UpdateScreen {
+    state.data.modify(|data| {
+        if data.selected_theme.is_some() {
+            let selected_theme = data.selected_theme.unwrap();
+            let upload = upload_theme(data.themes[selected_theme].name.as_str());
+            match upload {
+                Ok(up) => {
+                    if up {
+                        println!("Uploaded new theme!");
+                        data.popup_shown = true;
+                        data.popup_current = PublishedOnline;
+                    } else {
+                        println!("Updated theme");
+                        data.popup_shown = true;
+                        data.popup_current = UpdatedOnline;
+                    }
+                },
+                Err(Error(Server(rse), _)) => {
+                    match rse {
+                        NotLoggedIn => {
+                            println!("Tried to publish online, but user is not logged in.");
+                            data.popup_shown = true;
+                            data.popup_current = NotSignedIn;
+                        },
+                        _ => println!("{:?}", rse)
+                    }
+                },
+                _ => {
+                    println!("{:?}", upload);
+                }
+            }
+        }
+    });
+    UpdateScreen::Redraw
 }
 fn empty_callback(state: &mut AppState<DataModel>, event: WindowEvent<DataModel>) -> UpdateScreen {
     UpdateScreen::DontRedraw
