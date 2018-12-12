@@ -1,16 +1,14 @@
 extern crate azul;
 extern crate ravenlib;
 extern crate reqwest;
-use azul::window_state::WindowSize;
-use azul::{prelude::*, widgets::button::Button, widgets::label::Label};
 use azul::app_state::AppStateNoData;
 use azul::widgets::text_input::*;
+use azul::window_state::WindowSize;
+use azul::{prelude::*, widgets::button::Button, widgets::label::Label};
 use config::*;
-use ravenlib::*;
-use ravenlib::ravenserver::*;
 use ravenlib::error::*;
-use ErrorKind::*;
-use RavenServerErrorKind::*;
+use ravenlib::ravenserver::*;
+use ravenlib::*;
 use std::cell::RefCell;
 use std::collections::BTreeSet;
 use std::fs;
@@ -21,7 +19,9 @@ use std::io::Write;
 use std::process::Command;
 use std::sync::Arc;
 use themes::*;
+use ErrorKind::*;
 use NodeType::*;
+use RavenServerErrorKind::*;
 enum Popup {
     New,
     Install,
@@ -29,7 +29,8 @@ enum Popup {
     DidNotExist,
     NotSignedIn,
     PublishedOnline,
-    UpdatedOnline
+    UpdatedOnline,
+    NotSelected,
 }
 use Popup::*;
 impl Popup {
@@ -41,25 +42,28 @@ impl Popup {
             DidNotExist => "Theme Does Not Exist",
             NotSignedIn => "You are not logged into ThemeHub",
             PublishedOnline => "Published theme online",
-            UpdatedOnline => "Updated theme online"
-        }.to_string()
+            UpdatedOnline => "Updated theme online",
+            NotSelected => "You don't have a theme selected",
+        }
+        .to_string()
     }
     fn callback(&self) -> Callback<DataModel> {
         Callback(match self {
-                New => create_callback,
-                Install => install_callback,
-                _ => empty_callback
+            New => create_callback,
+            Install => install_callback,
+            _ => empty_callback,
         })
     }
     fn is_input(&self) -> bool {
-       match self {
-        Installed => false,
-        DidNotExist => false,
-        NotSignedIn => false,
-        PublishedOnline => false,
-        UpdatedOnline => false,
-        _ => true
-       }
+        match self {
+            Installed => false,
+            DidNotExist => false,
+            NotSignedIn => false,
+            PublishedOnline => false,
+            UpdatedOnline => false,
+            NotSelected => false,
+            _ => true,
+        }
     }
 }
 struct DataModel {
@@ -94,22 +98,38 @@ impl Layout for DataModel {
             .with_id("themes-list")
             .with_callback(On::MouseUp, Callback(select_theme));
         let delete_button = Button::with_label("Delete Theme")
-            .dom().with_class("bot-button")
+            .dom()
+            .with_class("bot-button")
             .with_callback(On::MouseUp, Callback(delete_callback));
         let load_button = Button::with_label("Load Theme")
-            .dom().with_class("bot-button")
+            .dom()
+            .with_class("bot-button")
             .with_callback(On::MouseUp, Callback(load_callback));
         let refresh_button = Button::with_label("Refresh Last Theme")
-            .dom().with_class("bot-button")
+            .dom()
+            .with_class("bot-button")
             .with_callback(On::MouseUp, Callback(refresh_callback));
         let mut cur_theme = Dom::new(Div).with_id("cur-theme");
         let online_button = Button::with_label("View on ThemeHub")
-            .dom().with_class("bot-button")
+            .dom()
+            .with_class("bot-button")
             .with_callback(On::MouseUp, Callback(online_callback));
-        let new_button = Button::with_label("New Theme").dom().with_class("bot-button").with_callback(On::MouseUp, Callback(show_new_box));
-        let install_button = Button::with_label("Install Theme").dom().with_class("bot-button").with_callback(On::MouseUp, Callback(show_install_box));
-        let open_button = Button::with_label("View in File Manager").dom().with_class("bot-button").with_callback(On::MouseUp, Callback(open_callback));
-        let publish_button = Button::with_label("Publish on ThemeHub").dom().with_class("bot-button").with_callback(On::MouseUp, Callback(publish_callback));
+        let new_button = Button::with_label("New Theme")
+            .dom()
+            .with_class("bot-button")
+            .with_callback(On::MouseUp, Callback(show_new_box));
+        let install_button = Button::with_label("Install Theme")
+            .dom()
+            .with_class("bot-button")
+            .with_callback(On::MouseUp, Callback(show_install_box));
+        let open_button = Button::with_label("View in File Manager")
+            .dom()
+            .with_class("bot-button")
+            .with_callback(On::MouseUp, Callback(open_callback));
+        let publish_button = Button::with_label("Publish on ThemeHub")
+            .dom()
+            .with_class("bot-button")
+            .with_callback(On::MouseUp, Callback(publish_callback));
         if self.selected_theme.is_some() && self.selected_theme.unwrap() < self.themes.len() {
             let theme = &self.themes[self.selected_theme.unwrap()];
 
@@ -137,7 +157,8 @@ impl Layout for DataModel {
             .with_child(load_button)
             .with_child(delete_button)
             .with_child(new_button)
-            .with_child(install_button).with_child(publish_button);
+            .with_child(install_button)
+            .with_child(publish_button);
         let right = Dom::new(Div)
             .with_id("right")
             .with_child(cur_theme)
@@ -147,15 +168,29 @@ impl Layout for DataModel {
             .with_child(buts)
             .with_child(right);
         if self.popup_shown {
-            let close_popup = Button::with_label("x").dom().with_class("popup-close").with_callback(On::MouseUp, Callback(hide_popup));
+            let close_popup = Button::with_label("x")
+                .dom()
+                .with_class("popup-close")
+                .with_callback(On::MouseUp, Callback(hide_popup));
             let mut popup = Dom::new(Div).with_class("popup").with_child(close_popup);
             if self.popup_current.is_input() {
-                let submit = Button::with_label(self.popup_current.label()).dom().with_class("popup-submit").with_callback(On::MouseUp, self.popup_current.callback());
-                let popup_input = TextInput::new().bind(info.window, &self.popup_input, &self).dom(&self.popup_input).with_class("popup-input");
+                let submit = Button::with_label(self.popup_current.label())
+                    .dom()
+                    .with_class("popup-submit")
+                    .with_callback(On::MouseUp, self.popup_current.callback());
+                let popup_input = TextInput::new()
+                    .bind(info.window, &self.popup_input, &self)
+                    .dom(&self.popup_input)
+                    .with_class("popup-input");
                 popup = popup.with_child(popup_input).with_child(submit);
             } else {
-                let ok_button = Button::with_label("OK").dom().with_class("popup-submit").with_callback(On::MouseUp, Callback(hide_popup));
-                let label =Label::new(self.popup_current.label()).dom().with_class("popup-label");
+                let ok_button = Button::with_label("OK")
+                    .dom()
+                    .with_class("popup-submit")
+                    .with_callback(On::MouseUp, Callback(hide_popup));
+                let label = Label::new(self.popup_current.label())
+                    .dom()
+                    .with_class("popup-label");
                 popup = popup.with_child(label).with_child(ok_button);
             }
             dom = dom.with_child(popup);
@@ -163,7 +198,10 @@ impl Layout for DataModel {
         dom
     }
 }
-fn publish_callback(state: &mut AppState<DataModel>, event: WindowEvent<DataModel>) -> UpdateScreen {
+fn publish_callback(
+    state: &mut AppState<DataModel>,
+    event: WindowEvent<DataModel>,
+) -> UpdateScreen {
     state.data.modify(|data| {
         if data.selected_theme.is_some() {
             let selected_theme = data.selected_theme.unwrap();
@@ -179,21 +217,22 @@ fn publish_callback(state: &mut AppState<DataModel>, event: WindowEvent<DataMode
                         data.popup_shown = true;
                         data.popup_current = UpdatedOnline;
                     }
-                },
-                Err(Error(Server(rse), _)) => {
-                    match rse {
-                        NotLoggedIn => {
-                            println!("Tried to publish online, but user is not logged in.");
-                            data.popup_shown = true;
-                            data.popup_current = NotSignedIn;
-                        },
-                        _ => println!("{:?}", rse)
+                }
+                Err(Error(Server(rse), _)) => match rse {
+                    NotLoggedIn => {
+                        println!("Tried to publish online, but user is not logged in.");
+                        data.popup_shown = true;
+                        data.popup_current = NotSignedIn;
                     }
+                    _ => println!("{:?}", rse),
                 },
                 _ => {
                     println!("{:?}", upload);
                 }
             }
+        } else {
+            data.popup_shown = true;
+            data.popup_current = NotSelected;
         }
     });
     UpdateScreen::Redraw
@@ -201,7 +240,10 @@ fn publish_callback(state: &mut AppState<DataModel>, event: WindowEvent<DataMode
 fn empty_callback(state: &mut AppState<DataModel>, event: WindowEvent<DataModel>) -> UpdateScreen {
     UpdateScreen::DontRedraw
 }
-fn install_callback(state: &mut AppState<DataModel>, event: WindowEvent<DataModel>) -> UpdateScreen {
+fn install_callback(
+    state: &mut AppState<DataModel>,
+    event: WindowEvent<DataModel>,
+) -> UpdateScreen {
     let mut option_string = String::new();
     state.data.modify(|data| {
         let name = data.popup_input.text.clone();
@@ -215,11 +257,11 @@ fn install_callback(state: &mut AppState<DataModel>, event: WindowEvent<DataMode
                         DoesNotExist(s) => {
                             println!("This theme does not exist.");
                             data.popup_current = DidNotExist;
-                        },
-                        _ => println!("Error encountered.\n {:?}", rse)
+                        }
+                        _ => println!("Error encountered.\n {:?}", rse),
                     };
-                },
-                _ => println!("Error encountered.\n {:?}", err)
+                }
+                _ => println!("Error encountered.\n {:?}", err),
             };
         } else {
             download_theme(name.as_str(), true).expect("Couldn't install theme");
@@ -230,7 +272,12 @@ fn install_callback(state: &mut AppState<DataModel>, event: WindowEvent<DataMode
     });
     if option_string.len() > 0 {
         let font_id = FontId::BuiltinFont("sans-serif".into());
-        let text_id = state.resources.add_text_cached(option_string, &font_id, StyleFontSize(PixelValue::px(10.0)), None);
+        let text_id = state.resources.add_text_cached(
+            option_string,
+            &font_id,
+            StyleFontSize(PixelValue::px(10.0)),
+            None,
+        );
         state.data.modify(|data| {
             data.text.push(text_id);
             data.popup_current = Installed;
@@ -238,7 +285,10 @@ fn install_callback(state: &mut AppState<DataModel>, event: WindowEvent<DataMode
     }
     UpdateScreen::Redraw
 }
-fn show_install_box(state: &mut AppState<DataModel>, event: WindowEvent<DataModel>) -> UpdateScreen {
+fn show_install_box(
+    state: &mut AppState<DataModel>,
+    event: WindowEvent<DataModel>,
+) -> UpdateScreen {
     state.data.modify(|data| {
         data.popup_current = Popup::Install;
         data.popup_shown = true;
@@ -263,7 +313,12 @@ fn create_callback(state: &mut AppState<DataModel>, event: WindowEvent<DataModel
         data.themes.push(theme);
     });
     let font_id = FontId::BuiltinFont("sans-serif".into());
-    let text_id = state.resources.add_text_cached(option_string, &font_id, StyleFontSize(PixelValue::px(10.0)), None);
+    let text_id = state.resources.add_text_cached(
+        option_string,
+        &font_id,
+        StyleFontSize(PixelValue::px(10.0)),
+        None,
+    );
     state.data.modify(|data| {
         data.text.push(text_id);
     });
@@ -288,21 +343,32 @@ fn load_callback(state: &mut AppState<DataModel>, event: WindowEvent<DataModel>)
         run_theme(&data.themes[data.selected_theme.unwrap()]).unwrap();
         UpdateScreen::Redraw
     } else {
+        drop(data);
+        state.data.modify(|data| {
+            data.popup_shown = true;
+            data.popup_current = NotSelected;
+        });
         UpdateScreen::DontRedraw
     }
 }
 fn open_callback(state: &mut AppState<DataModel>, event: WindowEvent<DataModel>) -> UpdateScreen {
     let data = state.data.lock().unwrap();
     if data.selected_theme.is_some() {
-        let path = get_home()+"/.config/raven/themes/"+&data.themes[data.selected_theme.unwrap()].name;
-        println!("{}",path);
+        let path =
+            get_home() + "/.config/raven/themes/" + &data.themes[data.selected_theme.unwrap()].name;
+        println!("{}", path);
         let output = Command::new("xdg-open")
             .arg(path)
             .spawn()
             .expect("Couldn't use xdg-open to open folder");
+    } else {
+        drop(data);
+        state.data.modify(|data| {
+            data.popup_shown = true;
+            data.popup_current = NotSelected;
+        });
     }
     UpdateScreen::DontRedraw
-
 }
 fn delete_callback(state: &mut AppState<DataModel>, event: WindowEvent<DataModel>) -> UpdateScreen {
     let mut up = UpdateScreen::DontRedraw;
@@ -316,6 +382,9 @@ fn delete_callback(state: &mut AppState<DataModel>, event: WindowEvent<DataModel
             data.themes.remove(data.selected_theme.unwrap());
             data.selected_theme = Some(0);
             up = UpdateScreen::Redraw
+        } else {
+            data.popup_shown = true;
+            data.popup_current = NotSelected;
         }
     });
     up
@@ -336,6 +405,12 @@ fn online_callback(state: &mut AppState<DataModel>, event: WindowEvent<DataModel
             .arg(uri)
             .output()
             .expect("Couldn't use xdg-open to launch website");
+    } else {
+        drop(data);
+        state.data.modify(|data| {
+            data.popup_shown = true;
+            data.popup_current = NotSelected;
+        });
     }
     UpdateScreen::DontRedraw
 }
@@ -368,7 +443,9 @@ fn theme_text(theme: &Theme) -> String {
         .iter()
         .fold(text, |acc, opt| acc + &format!("- {}\n", opt.to_string()));
     option_string += "Key-Value Options: \n\n";
-    option_string = theme.kv.iter().fold(option_string, |acc, (k,v)| acc + &format!("- {} : {}\n",k.as_str(),v));
+    option_string = theme.kv.iter().fold(option_string, |acc, (k, v)| {
+        acc + &format!("- {} : {}\n", k.as_str(), v)
+    });
     return option_string;
 }
 fn main() {
@@ -401,7 +478,7 @@ fn main() {
             font: font_id.clone(),
             popup_input: TextInputState::default(),
             popup_shown: false,
-            popup_current: New
+            popup_current: New,
         },
         AppConfig::default(),
     );
@@ -463,5 +540,4 @@ fn main() {
     let css = Css::override_native(include_str!(CSS_PATH!())).unwrap();
     let window = Window::new(create_options, css).unwrap();
     app.run(window).unwrap();
-
 }
