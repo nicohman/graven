@@ -1,0 +1,26 @@
+image: debian/buster
+packages:
+  - cargo
+  - cmake
+  - libfontconfig1-dev
+  - rsync1
+  - python3
+  - libxcb-xkb-dev
+  - libgles2-mesa-dev
+  - libfreetype6-dev
+  - libexpat-dev
+  - libssl-dev
+secrets:
+  - 89991b16-705b-4276-9178-bfc81c7fdd28
+environment:
+  deploy: nicohman@demenses.net
+sources:
+  - https://git.sr.ht/~nicohman/graven
+tasks:
+  - build: |
+      cd graven
+      cargo build --release
+  - deploy: |
+      cd graven/target/release
+      sshopts="ssh -o StrictHostKeyChecking=no"
+      rsync --rsh="$sshopts" -rP graven $deploy:/home/nicohman/ravenserver/public/static/graven-nightly
