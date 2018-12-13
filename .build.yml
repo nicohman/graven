@@ -3,7 +3,7 @@ packages:
   - cargo
   - cmake
   - libfontconfig1-dev
-  - rsync1
+  - rsync
   - python3
   - libxcb-xkb-dev
   - libgles2-mesa-dev
